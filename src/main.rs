@@ -1,12 +1,13 @@
 // Uncomment this block to pass the first stage
 use std::{
     io::Write,
-    net::{Shutdown, TcpListener, TcpStream},
+    net::{TcpListener, TcpStream},
 };
 
 fn handle_client(mut stream: TcpStream) {
-    let _ = stream.write_all(b"HTTP/1.1 200 OK\r\n\r\n");
-    let _ = stream.shutdown(Shutdown::Write);
+    stream
+        .write_all(b"HTTP/1.1 200 OK\r\n\r\n")
+        .expect("Unable to write to stream.")
 }
 
 fn main() {
@@ -19,10 +20,7 @@ fn main() {
 
     for stream in listener.incoming() {
         match stream {
-            Ok(stream) => {
-                handle_client(stream);
-                println!("accepted new connection");
-            }
+            Ok(stream) => handle_client(stream),
             Err(e) => {
                 println!("error: {}", e);
             }
