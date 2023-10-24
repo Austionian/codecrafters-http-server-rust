@@ -1,11 +1,12 @@
 // Uncomment this block to pass the first stage
 use std::{
     io::Write,
-    net::{TcpListener, TcpStream},
+    net::{Shutdown, TcpListener, TcpStream},
 };
 
 fn handle_client(mut stream: TcpStream) {
     let _ = stream.write_all(b"HTTP/1.1 200 OK\r\n\r\n");
+    let _ = stream.shutdown(Shutdown::Write);
 }
 
 fn main() {
