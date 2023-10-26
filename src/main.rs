@@ -60,8 +60,6 @@ fn handle_client(mut stream: TcpStream) {
 
     let start_line = buffer.parse::<StartLine>();
 
-    println!("{:?}", start_line);
-
     match start_line {
         Ok(s) => {
             if s.path == "/" {
@@ -75,6 +73,7 @@ fn handle_client(mut stream: TcpStream) {
             }
         }
         Err(_) => {
+            println!("Error!");
             stream
                 .write(b"HTTP/1.1 500 Internal Server Error")
                 .expect("Failed to write to stream.");
