@@ -1,14 +1,83 @@
-// Uncomment this block to pass the first stage
+use anyhow::{anyhow, bail};
+use itertools::Itertools;
 use std::{
-    io::Write,
-    net::{Shutdown, TcpListener, TcpStream},
+    io::{Read, Write},
+    net::{TcpListener, TcpStream},
+    str::FromStr,
 };
 
+#[derive(Debug)]
+enum Method {
+    GET,
+    POST,
+    PUT,
+}
+
+#[derive(Debug)]
+struct StartLine {
+    method: Method,
+    path: String,
+    version: String,
+}
+
+impl FromStr for Method {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "GET" => Ok(Method::GET),
+            "POST" => Ok(Method::POST),
+            "PUT" => Ok(Method::PUT),
+            _ => bail!("Invalid method given."),
+        }
+    }
+}
+
+impl FromStr for StartLine {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (method, path, version) = s
+            .split(' ')
+            .collect_tuple()
+            .ok_or(anyhow!("Incorrect start line provided."))?;
+
+        let method = method.parse()?;
+
+        Ok(StartLine {
+            method,
+            path: path.to_string(),
+            version: version.to_string(),
+        })
+    }
+}
+
 fn handle_client(mut stream: TcpStream) {
-    let _ = stream.write(b"HTTP/1.1 200 OK\r\n\r\n");
-    stream
-        .shutdown(Shutdown::Write)
-        .expect("Fail to shutdown stream")
+    let mut buffer = String::new();
+    let _ = stream
+        .read_to_string(&mut buffer)
+        .expect("unable to read to buffer");
+
+    let start_line = buffer.parse::<StartLine>();
+
+    match start_line {
+        Ok(s) => {
+            if s.path != "/" {
+                stream
+                    .write(b"HTTP/1.1 404 Not Found\r\n\r\n")
+                    .expect("Failed to write to stream.");
+            } else {
+                stream
+                    .write(b"HTTP/1.1 200 OK\r\n\r\n")
+                    .expect("Failed to write to stream.");
+            }
+        }
+        Err(_) => {
+            stream
+                .write(b"HTTP/1.1 500 Internal Server Error")
+                .expect("Failed to write to stream.");
+        }
+    }
 }
 
 fn main() {
