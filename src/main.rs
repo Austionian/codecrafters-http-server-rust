@@ -15,9 +15,9 @@ enum Method {
 
 #[derive(Debug)]
 struct StartLine {
-    method: Method,
+    _method: Method,
     path: String,
-    version: String,
+    _version: String,
 }
 
 impl FromStr for Method {
@@ -42,12 +42,12 @@ impl FromStr for StartLine {
             .collect_tuple()
             .ok_or(anyhow!("Incorrect start line provided."))?;
 
-        let method = method.parse()?;
+        let _method = method.parse()?;
 
         Ok(StartLine {
-            method,
+            _method,
             path: path.to_string(),
-            version: version.to_string(),
+            _version: version.to_string(),
         })
     }
 }
