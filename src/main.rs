@@ -1,10 +1,9 @@
 use anyhow::{anyhow, bail};
 use itertools::Itertools;
-use std::{
-    io::{Read, Write},
-    net::{TcpListener, TcpStream},
-    str::FromStr,
-};
+use std::str::FromStr;
+use std::string::FromUtf8Error;
+use tokio::io::{self, AsyncWriteExt};
+use tokio::net::{TcpListener, TcpStream};
 
 #[derive(Debug)]
 enum Method {
@@ -52,50 +51,44 @@ impl FromStr for StartLine {
     }
 }
 
-fn handle_client(mut stream: TcpStream) {
-    let mut buffer = String::new();
-    let _ = stream
-        .read_to_string(&mut buffer)
-        .expect("unable to read to buffer");
-
-    let start_line = buffer.parse::<StartLine>();
-
-    match start_line {
-        Ok(s) => {
-            if s.path == "/" {
-                stream
-                    .write(b"HTTP/1.1 200 OK\r\n\r\n")
-                    .expect("Failed to write to stream.");
-            } else {
-                stream
-                    .write(b"HTTP/1.1 404 Not Found\r\n\r\n")
-                    .expect("Failed to write to stream.");
-            }
-        }
-        Err(_) => {
-            stream
-                .write(b"HTTP/1.1 500 Internal Server Error")
-                .expect("Failed to write to stream.");
-        }
-    }
+fn io_error(_: FromUtf8Error) -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidData, "Invalid string")
 }
 
-fn main() {
+async fn handle_client(mut stream: TcpStream) -> Result<usize, io::Error> {
+    let mut buf = Vec::with_capacity(4096);
+
+    let _ = stream.readable().await;
+
+    let _ = stream.try_read_buf(&mut buf)?;
+
+    let start_line = String::from_utf8(buf)
+        .map_err(io_error)?
+        .parse::<StartLine>();
+
+    return match start_line {
+        Ok(s) => {
+            if s.path == "/" {
+                return stream.write(b"HTTP/1.1 200 OK\r\n\r\n").await;
+            } else {
+                return stream.write(b"HTTP/1.1 404 Not Found\r\n\r\n").await;
+            }
+        }
+        Err(_) => stream.write(b"HTTP/1.1 500 Internal Server Error").await,
+    };
+}
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
     println!("Logs from your program will appear here!");
 
     // Uncomment this block to pass the first stage
 
-    let listener = TcpListener::bind("127.0.0.1:4221").unwrap();
+    let listener = TcpListener::bind("127.0.0.1:4221").await?;
 
-    for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
-                handle_client(stream);
-            }
-            Err(e) => {
-                println!("error: {}", e);
-            }
-        }
+    loop {
+        let (socket, _) = listener.accept().await?;
+        handle_client(socket).await?;
     }
 }
