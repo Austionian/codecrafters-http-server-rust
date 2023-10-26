@@ -1,17 +1,22 @@
 // Uncomment this block to pass the first stage
 use std::{
-    io::Write,
+    io::{self, Read, Write},
     net::{Shutdown, TcpListener, TcpStream},
 };
 
-fn handle_client(mut stream: TcpStream) {
-    let _ = stream.write(b"HTTP/1.1 200 OK\r\n\r\n");
-    stream
-        .shutdown(Shutdown::Write)
-        .expect("Fail to shutdown stream")
+fn handle_client(mut stream: TcpStream) -> Result<(), io::Error> {
+    let mut buffer = String::new();
+    let _ = stream.read_to_string(&mut buffer)?;
+
+    println!("{buffer}");
+
+    let _ = stream.write(b"HTTP/1.1 200 OK\r\n\r\n")?;
+    stream.shutdown(Shutdown::Write)?;
+
+    Ok(())
 }
 
-fn main() {
+fn main() -> Result<(), io::Error> {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
     println!("Logs from your program will appear here!");
 
@@ -21,10 +26,12 @@ fn main() {
 
     for stream in listener.incoming() {
         match stream {
-            Ok(stream) => handle_client(stream),
+            Ok(stream) => handle_client(stream)?,
             Err(e) => {
                 println!("error: {}", e);
             }
         }
     }
+
+    Ok(())
 }
