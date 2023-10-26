@@ -58,9 +58,9 @@ fn handle_client(mut stream: TcpStream) {
         .read_to_string(&mut buffer)
         .expect("unable to read to buffer");
 
-    println!("{buffer}");
-
     let start_line = buffer.parse::<StartLine>();
+
+    println!("{:?}", start_line);
 
     match start_line {
         Ok(s) => {
