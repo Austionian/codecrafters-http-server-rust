@@ -37,6 +37,9 @@ impl FromStr for StartLine {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (method, path, version) = s
+            .lines()
+            .next()
+            .unwrap()
             .split(' ')
             .collect_tuple()
             .ok_or(anyhow!("Incorrect start line provided."))?;
