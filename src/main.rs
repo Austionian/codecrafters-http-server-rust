@@ -79,7 +79,9 @@ fn handle_client(mut stream: TcpStream) {
         }
     }
 
-    let _ = stream.shutdown(Shutdown::Both);
+    stream
+        .shutdown(Shutdown::Both)
+        .expect("Failed to shutdown.");
 }
 
 fn main() {
