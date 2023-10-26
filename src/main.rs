@@ -73,7 +73,6 @@ fn handle_client(mut stream: TcpStream) {
             }
         }
         Err(_) => {
-            println!("Error!");
             stream
                 .write(b"HTTP/1.1 500 Internal Server Error")
                 .expect("Failed to write to stream.");
@@ -91,7 +90,9 @@ fn main() {
 
     for stream in listener.incoming() {
         match stream {
-            Ok(stream) => handle_client(stream),
+            Ok(stream) => {
+                handle_client(stream);
+            }
             Err(e) => {
                 println!("error: {}", e);
             }
