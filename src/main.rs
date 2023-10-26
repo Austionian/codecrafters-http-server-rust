@@ -2,7 +2,7 @@ use anyhow::{anyhow, bail};
 use itertools::Itertools;
 use std::{
     io::{Read, Write},
-    net::{TcpListener, TcpStream},
+    net::{Shutdown, TcpListener, TcpStream},
     str::FromStr,
 };
 
@@ -78,6 +78,8 @@ fn handle_client(mut stream: TcpStream) {
                 .expect("Failed to write to stream.");
         }
     }
+
+    let _ = stream.shutdown(Shutdown::Both);
 }
 
 fn main() {
