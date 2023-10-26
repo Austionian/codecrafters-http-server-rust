@@ -78,13 +78,9 @@ fn handle_client(mut stream: TcpStream) {
                 .expect("Failed to write to stream.");
         }
     }
-
-    stream
-        .shutdown(Shutdown::Both)
-        .expect("Failed to shutdown.");
 }
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
     println!("Logs from your program will appear here!");
 
@@ -100,4 +96,6 @@ fn main() {
             }
         }
     }
+
+    Ok(())
 }
