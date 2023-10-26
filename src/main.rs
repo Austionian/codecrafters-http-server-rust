@@ -2,7 +2,7 @@ use anyhow::{anyhow, bail};
 use itertools::Itertools;
 use std::{
     io::{Read, Write},
-    net::{Shutdown, TcpListener, TcpStream},
+    net::{TcpListener, TcpStream},
     str::FromStr,
 };
 
@@ -58,17 +58,19 @@ fn handle_client(mut stream: TcpStream) {
         .read_to_string(&mut buffer)
         .expect("unable to read to buffer");
 
+    println!("{buffer}");
+
     let start_line = buffer.parse::<StartLine>();
 
     match start_line {
         Ok(s) => {
-            if s.path != "/" {
+            if s.path == "/" {
                 stream
-                    .write(b"HTTP/1.1 404 Not Found\r\n\r\n")
+                    .write(b"HTTP/1.1 200 OK\r\n\r\n")
                     .expect("Failed to write to stream.");
             } else {
                 stream
-                    .write(b"HTTP/1.1 200 OK\r\n\r\n")
+                    .write(b"HTTP/1.1 404 Not Found\r\n\r\n")
                     .expect("Failed to write to stream.");
             }
         }
@@ -80,7 +82,7 @@ fn handle_client(mut stream: TcpStream) {
     }
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
     println!("Logs from your program will appear here!");
 
@@ -96,6 +98,4 @@ fn main() -> anyhow::Result<()> {
             }
         }
     }
-
-    Ok(())
 }
