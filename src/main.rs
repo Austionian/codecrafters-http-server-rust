@@ -121,7 +121,7 @@ async fn handle_client(mut stream: TcpStream) -> Result<usize, io::Error> {
                     .1;
                 return stream.write(
                     format!(
-                        "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}\r\n",
+                        "HTTP/1.1 200 OK\r\n\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}\r\n",
                         path.len(),
                         path
                     ).as_bytes()).await;
@@ -133,7 +133,7 @@ async fn handle_client(mut stream: TcpStream) -> Result<usize, io::Error> {
                 ))?;
                 return stream.write(
                     format!(
-                        "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}\r\n",
+                        "HTTP/1.1 200 OK\r\n\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}\r\n",
                         user_agent.len(),
                         user_agent
                     ).as_bytes()).await;
