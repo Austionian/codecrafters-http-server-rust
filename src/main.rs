@@ -62,22 +62,34 @@ impl FromStr for Request {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (start_line, str_headers) = s.split_once("\n\n").ok_or(anyhow!("Invalid request."))?;
+        let request = s.split_once("\n\n");
 
-        let start_line = start_line.parse::<StartLine>()?;
+        return match request {
+            Some((start_line, str_headers)) => {
+                let start_line = start_line.parse::<StartLine>()?;
 
-        let mut headers = HashMap::new();
+                let mut headers = HashMap::new();
 
-        str_headers.lines().for_each(|line| {
-            let (k, v) = line.split_once(": ").unwrap();
+                str_headers.lines().for_each(|line| {
+                    let (k, v) = line.split_once(": ").unwrap();
 
-            headers.insert(k.to_string(), v.to_string());
-        });
+                    headers.insert(k.to_string(), v.to_string());
+                });
 
-        Ok(Request {
-            start_line,
-            headers,
-        })
+                Ok(Request {
+                    start_line,
+                    headers,
+                })
+            }
+            None => {
+                let start_line = s.parse::<StartLine>()?;
+
+                Ok(Request {
+                    start_line,
+                    headers: HashMap::default(),
+                })
+            }
+        };
     }
 }
 
