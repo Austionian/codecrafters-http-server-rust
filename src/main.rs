@@ -75,7 +75,7 @@ async fn handle_client(mut stream: TcpStream) -> Result<usize, io::Error> {
             _ if s.path.starts_with("/echo") => {
                 let collection = s.path.split('/').collect_vec();
                 let path = collection.last().expect("Invalid path provided");
-                return stream.write(format!("HTTP/1.1 200 OK\r\nContent-Type: text/plan\r\nContent-Length: {}\r\n\r\n{}\r\n", path.len(), path).as_bytes()).await;
+                return stream.write(format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}\r\n", path.len(), path).as_bytes()).await;
             }
             _ => stream.write(b"HTTP/1.1 404 Not Found\r\n\r\n").await,
         },
