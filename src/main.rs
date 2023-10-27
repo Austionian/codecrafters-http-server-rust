@@ -26,7 +26,7 @@ enum Method {
 
 #[derive(Debug)]
 struct StartLine {
-    _method: Method,
+    method: Method,
     path: String,
     _version: String,
 }
@@ -35,6 +35,7 @@ struct StartLine {
 struct Request {
     start_line: StartLine,
     headers: HashMap<String, String>,
+    body: Option<String>,
 }
 
 impl FromStr for Method {
@@ -62,10 +63,10 @@ impl FromStr for StartLine {
             .collect_tuple()
             .ok_or(anyhow!("Incorrect start line provided."))?;
 
-        let _method = method.parse()?;
+        let method = method.parse()?;
 
         Ok(Self {
-            _method,
+            method,
             path: path.to_string(),
             _version: version.to_string(),
         })
@@ -81,16 +82,32 @@ impl FromStr for Request {
         let start_line = start_line.parse::<StartLine>()?;
 
         let mut headers = HashMap::new();
+        let mut body = None;
 
-        str_headers.trim_end().lines().for_each(|line| {
-            let (k, v) = line.split_once(": ").unwrap();
+        match start_line.method {
+            Method::GET => {
+                str_headers.trim_end().lines().for_each(|line| {
+                    let (k, v) = line.split_once(": ").unwrap();
 
-            headers.insert(k.to_string(), v.to_string());
-        });
+                    headers.insert(k.to_string(), v.to_string());
+                });
+            }
+            _ => {
+                let (str_headers, str_body) = str_headers.split_once("\r\n\r\n").unwrap();
+                str_headers.lines().for_each(|line| {
+                    let (k, v) = line.split_once(": ").unwrap();
+
+                    headers.insert(k.to_string(), v.to_string());
+                });
+
+                body = Some(str_body.to_string());
+            }
+        }
 
         Ok(Request {
             start_line,
             headers,
+            body,
         })
     }
 }
@@ -109,9 +126,11 @@ async fn handle_client(
 
     let _ = stream.try_read_buf(&mut buf)?;
 
-    let start_line = String::from_utf8(buf).map_err(io_error)?.parse::<Request>();
+    let request = String::from_utf8(buf).map_err(io_error)?.parse::<Request>();
 
-    return match start_line {
+    println!("{:?}", request);
+
+    return match request {
         Ok(s) => match s.start_line.path.as_str() {
             "/" => stream.write(b"HTTP/1.1 200 OK\r\n\r\n").await,
             _ if s.start_line.path.starts_with("/echo") => {
@@ -140,12 +159,13 @@ async fn handle_client(
                         user_agent
                     ).as_bytes()).await;
             }
-            _ if s.start_line.path.starts_with("/files") => {
-                let file_name = s.start_line.path.split_once("/files/").unwrap().1;
-                let dir_name = dir.lock().unwrap().clone().unwrap();
-                let file = fs::read_to_string(format!("{}{}", dir_name, file_name).as_str());
+            _ if s.start_line.path.starts_with("/files") => match s.start_line.method {
+                Method::GET => {
+                    let file_name = s.start_line.path.split_once("/files/").unwrap().1;
+                    let dir_name = dir.lock().unwrap().clone().unwrap();
+                    let file = fs::read_to_string(format!("{}{}", dir_name, file_name).as_str());
 
-                match file {
+                    match file {
                     Ok(f) => {
                         stream
                             .write(
@@ -160,7 +180,18 @@ async fn handle_client(
                     }
                     Err(_) => stream.write(b"HTTP/1.1 404 Not Found\r\n\r\n").await,
                 }
-            }
+                }
+                Method::POST => {
+                    let file_name = s.start_line.path.split_once("/files/").unwrap().1;
+                    let dir_name = dir.lock().unwrap().clone().unwrap();
+                    let _ = fs::write(format!("{}{}", dir_name, file_name), s.body.unwrap());
+
+                    stream
+                        .write(format!("HTTP/1.1 201 OK\r\n\r\n",).as_bytes())
+                        .await
+                }
+                Method::PUT => unimplemented!(),
+            },
             _ => stream.write(b"HTTP/1.1 404 Not Found\r\n\r\n").await,
         },
         Err(_) => stream.write(b"HTTP/1.1 500 Internal Server Error").await,
