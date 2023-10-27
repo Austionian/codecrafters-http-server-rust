@@ -70,13 +70,15 @@ async fn handle_client(mut stream: TcpStream) -> Result<usize, io::Error> {
         .parse::<StartLine>();
 
     return match start_line {
-        Ok(s) => {
-            if s.path == "/" {
-                return stream.write(b"HTTP/1.1 200 OK\r\n\r\n").await;
-            } else {
-                return stream.write(b"HTTP/1.1 404 Not Found\r\n\r\n").await;
+        Ok(s) => match s.path.as_str() {
+            "/" => stream.write(b"HTTP/1.1 200 OK\r\n\r\n").await,
+            _ if s.path.starts_with("/echo") => {
+                let collection = s.path.split('/').collect_vec();
+                let path = collection.last().expect("Invalid path provided");
+                return stream.write(format!("HTTP/1.1 200 OK\r\nContent-Type: text/plan\r\nContent-Length: {}\r\n\r\n{}\r\n", path.len(), path).as_bytes()).await;
             }
-        }
+            _ => stream.write(b"HTTP/1.1 404 Not Found\r\n\r\n").await,
+        },
         Err(_) => stream.write(b"HTTP/1.1 500 Internal Server Error").await,
     };
 }
