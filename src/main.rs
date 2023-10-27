@@ -1,5 +1,6 @@
 use anyhow::{anyhow, bail};
 use itertools::Itertools;
+use std::collections::HashMap;
 use std::str::FromStr;
 use std::string::FromUtf8Error;
 use tokio::io::{self, AsyncWriteExt};
@@ -17,6 +18,12 @@ struct StartLine {
     _method: Method,
     path: String,
     _version: String,
+}
+
+#[derive(Debug)]
+struct Request {
+    start_line: StartLine,
+    headers: HashMap<String, String>,
 }
 
 impl FromStr for Method {
@@ -37,19 +44,39 @@ impl FromStr for StartLine {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (method, path, version) = s
-            .lines()
-            .next()
-            .unwrap()
             .split(' ')
             .collect_tuple()
             .ok_or(anyhow!("Incorrect start line provided."))?;
 
         let _method = method.parse()?;
 
-        Ok(StartLine {
+        Ok(Self {
             _method,
             path: path.to_string(),
             _version: version.to_string(),
+        })
+    }
+}
+
+impl FromStr for Request {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (start_line, str_headers) = s.split_once("\n\n").ok_or(anyhow!("Invalid request."))?;
+
+        let start_line = start_line.parse::<StartLine>()?;
+
+        let mut headers = HashMap::new();
+
+        str_headers.lines().for_each(|line| {
+            let (k, v) = line.split_once(": ").unwrap();
+
+            headers.insert(k.to_string(), v.to_string());
+        });
+
+        Ok(Request {
+            start_line,
+            headers,
         })
     }
 }
@@ -65,20 +92,36 @@ async fn handle_client(mut stream: TcpStream) -> Result<usize, io::Error> {
 
     let _ = stream.try_read_buf(&mut buf)?;
 
-    let start_line = String::from_utf8(buf)
-        .map_err(io_error)?
-        .parse::<StartLine>();
+    let start_line = String::from_utf8(buf).map_err(io_error)?.parse::<Request>();
 
     return match start_line {
-        Ok(s) => match s.path.as_str() {
+        Ok(s) => match s.start_line.path.as_str() {
             "/" => stream.write(b"HTTP/1.1 200 OK\r\n\r\n").await,
-            _ if s.path.starts_with("/echo") => {
+            _ if s.start_line.path.starts_with("/echo") => {
                 let path = s
+                    .start_line
                     .path
                     .split_once("/echo/")
                     .expect("Invalid path provided")
                     .1;
-                return stream.write(format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}\r\n", path.len(), path).as_bytes()).await;
+                return stream.write(
+                    format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}\r\n",
+                        path.len(),
+                        path
+                    ).as_bytes()).await;
+            }
+            _ if s.start_line.path.starts_with("/user-agent") => {
+                let user_agent = s.headers.get("User-Agent").ok_or(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "No user agent header.",
+                ))?;
+                return stream.write(
+                    format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}\r\n",
+                        user_agent.len(),
+                        user_agent
+                    ).as_bytes()).await;
             }
             _ => stream.write(b"HTTP/1.1 404 Not Found\r\n\r\n").await,
         },
