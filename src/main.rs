@@ -150,7 +150,8 @@ async fn handle_client(
                         stream
                             .write(
                                 format!(
-                        "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n\r\n{}\r\n",
+                        "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: {}\r\n\r\n{}\r\n",
+                        f.len(),
                         f
                     )
                                 .as_bytes(),
