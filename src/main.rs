@@ -143,6 +143,9 @@ async fn main() -> anyhow::Result<()> {
 
     loop {
         let (socket, _) = listener.accept().await?;
-        handle_client(socket).await?;
+
+        tokio::spawn(async move {
+            let _ = handle_client(socket).await;
+        });
     }
 }
