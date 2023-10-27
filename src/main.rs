@@ -65,7 +65,7 @@ impl FromStr for Request {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let request = s.split_once("\n\n");
+        let request = s.split_once("\r\n\r\n");
 
         return match request {
             Some((start_line, str_headers)) => {
