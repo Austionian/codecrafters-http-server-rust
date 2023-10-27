@@ -1,10 +1,21 @@
 use anyhow::{anyhow, bail};
+use clap::Parser;
 use itertools::Itertools;
 use std::collections::HashMap;
+use std::fs;
 use std::str::FromStr;
 use std::string::FromUtf8Error;
+use std::sync::{Arc, Mutex};
 use tokio::io::{self, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
+
+/// Simple program to greet a person
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    #[arg(short, long)]
+    directory: Option<String>,
+}
 
 #[derive(Debug)]
 enum Method {
@@ -88,7 +99,10 @@ fn io_error(_: FromUtf8Error) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, "Invalid string")
 }
 
-async fn handle_client(mut stream: TcpStream) -> Result<usize, io::Error> {
+async fn handle_client(
+    mut stream: TcpStream,
+    dir: Arc<Mutex<Option<String>>>,
+) -> Result<usize, io::Error> {
     let mut buf = Vec::with_capacity(4096);
 
     let _ = stream.readable().await;
@@ -126,6 +140,26 @@ async fn handle_client(mut stream: TcpStream) -> Result<usize, io::Error> {
                         user_agent
                     ).as_bytes()).await;
             }
+            _ if s.start_line.path.starts_with("/files") => {
+                let file_name = s.start_line.path.split_once("/files/").unwrap().1;
+                let dir_name = dir.lock().unwrap().clone().unwrap();
+                let file = fs::read_to_string(format!("{}{}", dir_name, file_name).as_str());
+
+                match file {
+                    Ok(f) => {
+                        stream
+                            .write(
+                                format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n\r\n{}\r\n",
+                        f
+                    )
+                                .as_bytes(),
+                            )
+                            .await
+                    }
+                    Err(_) => stream.write(b"HTTP/1.1 404 Not Found\r\n\r\n").await,
+                }
+            }
             _ => stream.write(b"HTTP/1.1 404 Not Found\r\n\r\n").await,
         },
         Err(_) => stream.write(b"HTTP/1.1 500 Internal Server Error").await,
@@ -137,15 +171,18 @@ async fn main() -> anyhow::Result<()> {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
     println!("Logs from your program will appear here!");
 
-    // Uncomment this block to pass the first stage
+    let args = Args::parse();
+
+    let dir = Arc::new(Mutex::new(args.directory));
 
     let listener = TcpListener::bind("127.0.0.1:4221").await?;
 
     loop {
+        let dir = dir.clone();
         let (socket, _) = listener.accept().await?;
 
         tokio::spawn(async move {
-            let _ = handle_client(socket).await;
+            let _ = handle_client(socket, dir).await;
         });
     }
 }
